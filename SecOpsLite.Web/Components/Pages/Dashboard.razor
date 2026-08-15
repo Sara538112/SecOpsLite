@@ -1,0 +1,64 @@
+@page "/dashboard"
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+@using Microsoft.AspNetCore.SignalR.Client
+
+<PageTitle>Canli Trafik</PageTitle>
+<h1>Canli Ag Tarfigi</h1>
+<p>Baglanti Durmu : @connectionStatus</p>
+
+<table class="table">
+    <thread>
+        <tr>
+            <th>Zaman</th>
+            <th>Kaynak IP</th>
+            <th>Hedef</th>
+            <th>Boyut</th>
+        </tr>
+    </thread>
+    <tbody>
+     @foreach(var packet in packets.Take(30)){
+        <tr>
+            <td>@packet.Timestamp.ToString("HH:mm:ss")</td>
+            <td>@packet.SourceIp</td>
+            <td>@packet.DestinationIp:@packet.DestinationPort</td>
+            <td>@packet.SizeBytes byte</td>
+        </tr>
+     }
+    </tbody>
+</table>
+
+@code {
+    private HubConnection? hubConnection;
+    private List<PacketDisplayModel> packets = new();
+    private string connectionStatus = " baglaniyor ..";
+
+    protected override async Task OnInitializedAsync(){
+        hubConnection = new HubConnectionBuilder()
+        .WithUrl(Navigation.ToAbsoluteUri("/packetHub"))
+        .Build();
+
+        hubConnection.On<PacketDisplayModel>("ReceivePacket" , (packet) =>
+        {
+            packets.Insert(0 , packet);
+            InvokeAsync(StateHasChanged);
+        }
+        );
+
+        await hubConnection.StartAsync();
+        connectionStatus = " Baglandi ";
+    }
+    public async ValueTask DisposeAsync(){
+        if(hubConnection is not null){
+            await hubConnection.DisposeAsync();
+        }
+    }
+    private class PacketDisplayModel{
+        public string SourceIp { get; set; } = string.Empty;
+        public string DestinationIp { get; set; } = string.Empty;
+        public int DestinationPort { get; set; }
+        public int SizeBytes { get; set; }
+        public DateTime Timestamp { get; set; }
+    }
+}   

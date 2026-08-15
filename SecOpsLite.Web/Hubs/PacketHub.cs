@@ -9,6 +9,9 @@ public class PacketHub:Hub{
     public async Task SendPacket(NetworkPacketDto packet){
         await Clients.All.SendAsync("ReceivePacket" , packet);
     }
+    public async Task SendAnormaly( object anormaly){
+        await Clients.All.SendAsync("ReceiveAnormaly" , anormaly);
+    }
 }
 
 public class NetworkPacketDto{
@@ -18,3 +21,4 @@ public class NetworkPacketDto{
     public int SizeBytes {get; set;}
     public DateTime Timestamp {get; set;}
 }
+

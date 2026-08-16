@@ -31,6 +31,7 @@ public class PacketConsumer : BackgroundService{
         
         await foreach ( var packet in _reader.ReadAllAsync(stoppingToken)){
             await _hubConnection.InvokeAsync("SendPacket" , packet , stoppingToken);
+            _logger.LogInformation("Paket gönderildi: {Ip}", packet.SourceIp);  // BUNU EKLE
             _recentPackets.Add(packet);
             var cutoff = DateTime.UtcNow - _analysisWindow;
             _recentPackets.RemoveAll(p => p.Timestamp < cutoff);
@@ -39,7 +40,6 @@ public class PacketConsumer : BackgroundService{
 
             foreach ( var (ruleName , result) in anormalies){
                 _logger.LogWarning("ANOMALİ [{Rule}]: {Description}", ruleName, result.Description);
-
                 await _hubConnection.InvokeAsync("SendAnormaly" , new
                 {
                     RuleName = ruleName,

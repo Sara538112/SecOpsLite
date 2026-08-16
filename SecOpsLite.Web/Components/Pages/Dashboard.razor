@@ -1,64 +1,114 @@
 @page "/dashboard"
-@rendermode InteractiveServer
-@inject NavigationManager Navigation
-@implements IAsyncDisposable
+
 @using Microsoft.AspNetCore.SignalR.Client
+@implements IAsyncDisposable
 
 <PageTitle>Canli Trafik</PageTitle>
-<h1>Canli Ag Tarfigi</h1>
-<p>Baglanti Durmu : @connectionStatus</p>
+
+<h1>Canli Ag Trafigi</h1>
+
+<p>Baglanti Durumu: @connectionStatus</p>
 
 <table class="table">
-    <thread>
+    <thead>
         <tr>
             <th>Zaman</th>
             <th>Kaynak IP</th>
             <th>Hedef</th>
             <th>Boyut</th>
         </tr>
-    </thread>
+    </thead>
+
     <tbody>
-     @foreach(var packet in packets.Take(30)){
-        <tr>
-            <td>@packet.Timestamp.ToString("HH:mm:ss")</td>
-            <td>@packet.SourceIp</td>
-            <td>@packet.DestinationIp:@packet.DestinationPort</td>
-            <td>@packet.SizeBytes byte</td>
-        </tr>
-     }
+        @foreach (var packet in packets.Take(30))
+        {
+            <tr>
+                <td>@packet.Timestamp.ToString("HH:mm:ss")</td>
+                <td>@packet.SourceIp</td>
+                <td>@packet.DestinationIp:@packet.DestinationPort</td>
+                <td>@packet.SizeBytes byte</td>
+            </tr>
+        }
     </tbody>
 </table>
 
-@code {
+@code
+{
     private HubConnection? hubConnection;
+
     private List<PacketDisplayModel> packets = new();
-    private string connectionStatus = " baglaniyor ..";
 
-    protected override async Task OnInitializedAsync(){
-        hubConnection = new HubConnectionBuilder()
-        .WithUrl(Navigation.ToAbsoluteUri("/packetHub"))
-        .Build();
+    private string connectionStatus = "Bağlanıyor...";
 
-        hubConnection.On<PacketDisplayModel>("ReceivePacket" , (packet) =>
-        {
-            packets.Insert(0 , packet);
-            InvokeAsync(StateHasChanged);
-        }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        Console.WriteLine(
+            "========== DASHBOARD OnAfterRender FIRST RENDER =========="
         );
 
-        await hubConnection.StartAsync();
-        connectionStatus = " Baglandi ";
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl("http://localhost:5128/packetHub")
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<PacketDisplayModel>(
+            "ReceivePacket",
+            packet =>
+            {
+                Console.WriteLine(
+                    $"[DEBUG] Paket alındı: {packet.SourceIp}"
+                );
+
+                packets.Insert(0, packet);
+
+                InvokeAsync(StateHasChanged);
+            });
+
+        try
+        {
+            await hubConnection.StartAsync();
+
+            Console.WriteLine(
+                "========== DASHBOARD SIGNALR BAĞLANDI =========="
+            );
+
+            connectionStatus = "Bağlandı";
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(
+                $"[DEBUG] Dashboard SignalR HATASI: {ex}"
+            );
+
+            connectionStatus = "HATA: " + ex.Message;
+
+            await InvokeAsync(StateHasChanged);
+        }
     }
-    public async ValueTask DisposeAsync(){
-        if(hubConnection is not null){
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
             await hubConnection.DisposeAsync();
         }
     }
-    private class PacketDisplayModel{
+
+    private class PacketDisplayModel
+    {
         public string SourceIp { get; set; } = string.Empty;
+
         public string DestinationIp { get; set; } = string.Empty;
+
         public int DestinationPort { get; set; }
+
         public int SizeBytes { get; set; }
+
         public DateTime Timestamp { get; set; }
     }
-}   
+}

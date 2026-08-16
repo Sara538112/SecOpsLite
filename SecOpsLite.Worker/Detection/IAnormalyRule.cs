@@ -7,4 +7,4 @@ public interface IAnormalyRule{
     AnormalyResult Evaluate(List<NetworkPacket> resentPackets);
 }
 
-public record AnormalyResult (bool IsAnormaly , string Description);
+public record AnormalyResult (bool IsAnormaly , string Description , string? SourceIp = null);

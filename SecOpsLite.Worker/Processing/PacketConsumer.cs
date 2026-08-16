@@ -12,6 +12,8 @@ public class PacketConsumer : BackgroundService{
     private readonly AnormalyDetector _anormalyDetector;
     private readonly List<NetworkPacket> _recentPackets = new();
     private readonly TimeSpan _analysisWindow = TimeSpan.FromSeconds(10); 
+    private readonly Dictionary<string , DateTime> _recentlyNotified = new();
+    private readonly TimeSpan _notificationCooldown = TimeSpan.FromSeconds(30);
 
     public PacketConsumer(ILogger <PacketConsumer> logger , ChannelReader <NetworkPacket> reader , AnormalyDetector anormalyDetector){
         _logger = logger;
@@ -27,11 +29,9 @@ public class PacketConsumer : BackgroundService{
             .Build();
         
         await _hubConnection.StartAsync(stoppingToken);
-        _logger.LogInformation("SignalR Hub'na baglandi .");
         
         await foreach ( var packet in _reader.ReadAllAsync(stoppingToken)){
             await _hubConnection.InvokeAsync("SendPacket" , packet , stoppingToken);
-            _logger.LogInformation("Paket gönderildi: {Ip}", packet.SourceIp);  // BUNU EKLE
             _recentPackets.Add(packet);
             var cutoff = DateTime.UtcNow - _analysisWindow;
             _recentPackets.RemoveAll(p => p.Timestamp < cutoff);
@@ -39,6 +39,15 @@ public class PacketConsumer : BackgroundService{
             var anormalies = _anormalyDetector.DetectAnormalies(_recentPackets);
 
             foreach ( var (ruleName , result) in anormalies){
+                
+                var notificationKey = $"{ruleName}:{result.SourceIp}";                
+                if(_recentlyNotified.TryGetValue(notificationKey , out var lastNotified)){
+                    if(DateTime.UtcNow - lastNotified < _notificationCooldown){
+                        continue;
+                    }
+                }
+                _recentlyNotified[notificationKey] = DateTime.UtcNow;
+
                 _logger.LogWarning("ANOMALİ [{Rule}]: {Description}", ruleName, result.Description);
                 await _hubConnection.InvokeAsync("SendAnormaly" , new
                 {

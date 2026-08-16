@@ -26,7 +26,8 @@ public class LargeTransferRule : IAnormalyRule{
 
         return new AnormalyResult(
         true,
-        $"{worst.SourceIp} adresinden toplam {worst.TotalBytes} byte veri transferi tespit edildi");
+        $"{worst.SourceIp} adresinden toplam {worst.TotalBytes} byte veri transferi tespit edildi",
+        worst.SourceIp);
     
     }
 }

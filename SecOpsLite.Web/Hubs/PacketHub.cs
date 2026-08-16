@@ -7,7 +7,6 @@ namespace SecOpsLite.Web.Hubs;
 public class PacketHub:Hub{
 
     public async Task SendPacket(NetworkPacketDto packet){
-        Console.WriteLine($"[HUB DEBUG] SendPacket çağrıldı: {packet.SourceIp}, bağlı client sayısı bilinmiyor ama yayınlanıyor");
         await Clients.All.SendAsync("ReceivePacket" , packet);
     }
     public async Task SendAnormaly( object anormaly){

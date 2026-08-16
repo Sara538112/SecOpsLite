@@ -45,10 +45,6 @@
         if (!firstRender)
             return;
 
-        Console.WriteLine(
-            "========== DASHBOARD OnAfterRender FIRST RENDER =========="
-        );
-
         hubConnection = new HubConnectionBuilder()
             .WithUrl("http://localhost:5128/packetHub")
             .WithAutomaticReconnect()
@@ -58,10 +54,6 @@
             "ReceivePacket",
             packet =>
             {
-                Console.WriteLine(
-                    $"[DEBUG] Paket alındı: {packet.SourceIp}"
-                );
-
                 packets.Insert(0, packet);
 
                 InvokeAsync(StateHasChanged);
@@ -71,20 +63,12 @@
         {
             await hubConnection.StartAsync();
 
-            Console.WriteLine(
-                "========== DASHBOARD SIGNALR BAĞLANDI =========="
-            );
-
             connectionStatus = "Bağlandı";
 
             await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
         {
-            Console.WriteLine(
-                $"[DEBUG] Dashboard SignalR HATASI: {ex}"
-            );
-
             connectionStatus = "HATA: " + ex.Message;
 
             await InvokeAsync(StateHasChanged);

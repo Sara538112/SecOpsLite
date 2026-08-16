@@ -21,7 +21,8 @@ public class BruteForceRule : IAnormalyRule{
 
         return new AnormalyResult(
             true,
-            $"{worstOffender.Key} adresinden {worstOffender.Count()} kez hassas port denemesi (SSH/RDP)");
+            $"{worstOffender.Key} adresinden {worstOffender.Count()} kez hassas port denemesi (SSH/RDP)",
+            worstOffender.Key);
         
     }
 }

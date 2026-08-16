@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: secopslite-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: secopslite
+      POSTGRES_USER: secopslite-user
+      POSTGRES_PASSWORD: sarcheopslite
+    ports:
+      - "5433:5432"
+    volumes:
+      - secopslite-pgdata:/var/lib/postgresql/data
+
+volumes:
+  secopslite-pgdata:

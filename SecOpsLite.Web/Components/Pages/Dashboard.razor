@@ -8,7 +8,19 @@
 <h1>Canli Ag Trafigi</h1>
 
 <p>Baglanti Durumu: @connectionStatus</p>
-
+@if (anormalies.Any()){
+    <div class = "mt-3 mb-3">
+        <h3 style = color : #b91c1c;> Tespit edilen Anomaliler</h3>
+        <ul class = "list-group">
+            @foreach(var anomaly in anormalies.Take(10)){
+                <li class = "list-group-item" style="border-left : 4px solid #b91c1c;">
+                <strong> [@anomaly.RuleName]</strong> - @anomaly.Description
+                <span class="text-muted" style="float : right;">@anomaly.Timestamp.ToString("HH:mm:ss")</span>
+                </li>
+            }
+        </ul>
+    </div>
+}
 <table class="table">
     <thead>
         <tr>
@@ -37,6 +49,7 @@
     private HubConnection? hubConnection;
 
     private List<PacketDisplayModel> packets = new();
+    private List<AnormalyDisplayModel> anormalies = new();
 
     private string connectionStatus = "Bağlanıyor...";
 
@@ -58,6 +71,11 @@
 
                 InvokeAsync(StateHasChanged);
             });
+        hubConnection.On<AnormalyDisplayModel>("ReceiveAnormaly" , (anormaly) =>
+        {
+            anormalies.Insert(0, anormaly);
+            InvokeAsync(StateHasChanged);
+        });
 
         try
         {
@@ -94,5 +112,10 @@
         public int SizeBytes { get; set; }
 
         public DateTime Timestamp { get; set; }
+    }
+    private class AnormalyDisplayModel{
+        public string RuleName {get; set;} = string.Empty;
+        public string Description {get; set;} = string.Empty;
+        public DateTime Timestamp {get; set;}
     }
 }

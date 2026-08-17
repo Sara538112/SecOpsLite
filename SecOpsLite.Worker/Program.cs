@@ -5,6 +5,7 @@ using SecOpsLite.Worker.Processing;
 using SecOpsLite.Worker.Detection;
 using Microsoft.EntityFrameworkCore;
 using SecOpsLite.Worker.Data;
+using SecOpsLite.Worker.Ai;
 
 var builder = Host.CreateApplicationBuilder(args);
 var channel = Channel.CreateUnbounded <NetworkPacket>();
@@ -17,6 +18,8 @@ builder.Services.AddSingleton<IAnormalyRule , LargeTransferRule>();
 builder.Services.AddSingleton<AnormalyDetector>();
 builder.Services.AddHostedService<Worker>();
 builder.Services.AddHostedService<PacketConsumer>();
+builder.Services.AddHttpClient<IGroqSummaryService, GroqSummaryService>();
+builder.Services.AddHostedService<SummaryWorker>();
 builder.Services.AddDbContext<AppDbContext>(options =>
  options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 

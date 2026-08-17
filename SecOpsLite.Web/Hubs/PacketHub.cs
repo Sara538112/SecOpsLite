@@ -7,10 +7,16 @@ namespace SecOpsLite.Web.Hubs;
 public class PacketHub:Hub{
 
     public async Task SendPacket(NetworkPacketDto packet){
+         Console.WriteLine($"[HUB DEBUG] SendPacket: {packet.SourceIp}");
         await Clients.All.SendAsync("ReceivePacket" , packet);
     }
     public async Task SendAnormaly( object anormaly){
+        Console.WriteLine("[HUB DEBUG] SendAnormaly");
         await Clients.All.SendAsync("ReceiveAnormaly" , anormaly);
+    }
+    public async Task SendSummary(object summary){
+        Console.WriteLine("[HUB DEBUG] SendSummary");
+        await Clients.All.SendAsync("ReceiveSummary" , summary);
     }
 }
 

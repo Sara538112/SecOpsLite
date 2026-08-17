@@ -43,38 +43,64 @@ public class PacketConsumer : BackgroundService{
 
             var anormalies = _anormalyDetector.DetectAnormalies(_recentPackets);
 
-            foreach ( var (ruleName , result) in anormalies){
-                
-                var notificationKey = $"{ruleName}:{result.SourceIp}";                
-                if(_recentlyNotified.TryGetValue(notificationKey , out var lastNotified)){
-                    if(DateTime.UtcNow - lastNotified < _notificationCooldown){
-                        continue;
+           foreach (var (ruleName, result) in anormalies)
+            {
+                try
+                {
+                    var notificationKey = $"{ruleName}:{result.SourceIp}";
+
+                    if (_recentlyNotified.TryGetValue(
+                        notificationKey,
+                        out var lastNotified))
+                    {
+                        if (DateTime.UtcNow - lastNotified < _notificationCooldown)
+                        {
+                            continue;
+                        }
                     }
-                }
-                _recentlyNotified[notificationKey] = DateTime.UtcNow;
 
-                _logger.LogWarning("ANOMALİ [{Rule}]: {Description}", ruleName, result.Description);
-                
-                //veritabanda kayet
-                using (var scope =_serviceProvider.CreateScope()){
-                    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    _recentlyNotified[notificationKey] = DateTime.UtcNow;
 
-                    context.AnomalyEvents.Add(new AnomalyEvent{
+                    _logger.LogWarning(
+                        "ANOMALİ [{Rule}]: {Description}",
+                        ruleName,
+                        result.Description);
+
+                    // Veritabanına kaydet
+                    using var scope = _serviceProvider.CreateScope();
+
+                    var context =
+                        scope.ServiceProvider
+                            .GetRequiredService<AppDbContext>();
+
+                    context.AnomalyEvents.Add(new AnomalyEvent
+                    {
                         RuleName = ruleName,
                         Description = result.Description,
-                        SourceIp= result.SourceIp,
+                        SourceIp = result.SourceIp,
                         DetectedAt = DateTime.UtcNow
                     });
 
                     await context.SaveChangesAsync(stoppingToken);
+
+                    // Dashboard'a gönder
+                    await _hubConnection.InvokeAsync(
+                        "SendAnormaly",
+                        new
+                        {
+                            RuleName = ruleName,
+                            Description = result.Description,
+                            Timestamp = DateTime.UtcNow
+                        },
+                        stoppingToken);
                 }
-                
-                await _hubConnection.InvokeAsync("SendAnormaly" , new
+                catch (Exception ex)
                 {
-                    RuleName = ruleName,
-                    Description = result.Description,
-                    Timestamp = DateTime.UtcNow
-                } , stoppingToken);
+                    _logger.LogError(
+                        ex,
+                        "Anomali işlenirken hata oluştu. Rule: {Rule}",
+                        ruleName);
+                }
             }
         
     

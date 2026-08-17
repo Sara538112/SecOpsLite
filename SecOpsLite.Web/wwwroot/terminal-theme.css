@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+:root {
+    --tt-bg: #0B0F13;
+    --tt-surface: #101720;
+    --tt-border: #1E2530;
+    --tt-border-soft: #161B23;
+    --tt-text: #E4E8EE;
+    --tt-text-soft: #B8C0CC;
+    --tt-text-muted: #6B7280;
+    --tt-green: #4ADE80;
+    --tt-red: #EF4444;
+    --tt-red-text: #F87171;
+    --tt-blue: #3B82F6;
+    --tt-amber: #FBBF24;
+}
+
+body {
+    background-color: var(--tt-bg) !important;
+    color: var(--tt-text);
+    font-family: 'Inter', sans-serif;
+}
+
+.tt-mono {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.tt-card {
+    background: var(--tt-surface);
+    border: 1px solid var(--tt-border);
+    border-radius: 8px;
+    padding: 20px 22px;
+}
+
+.tt-stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 34px;
+    font-weight: 600;
+}
+
+.tt-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--tt-text-muted);
+    letter-spacing: 0.06em;
+}

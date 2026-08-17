@@ -1,56 +1,83 @@
 @page "/dashboard"
-
 @using Microsoft.AspNetCore.SignalR.Client
 @implements IAsyncDisposable
+@using System.Linq
 
-<PageTitle>Canli Trafik</PageTitle>
+<PageTitle>SecOpsLite</PageTitle>
 
-<h1>Canli Ag Trafigi</h1>
+<div style="padding: 32px 40px; max-width: 1500px; margin: 0 auto;">
 
-<p>Baglanti Durumu: @connectionStatus</p>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--tt-border); padding-bottom: 12px;">
+        <span class="tt-mono" style="font-weight: 600; font-size: 25px; color: var(--tt-text);">SecOpsLite</span>     
+       <span class="tt-mono" style="font-size: 15px; color: @(connectionStatus == "Bağlandı" ? "var(--tt-green)" : "var(--tt-red)");">
+            ● @connectionStatus.ToUpper()
+        </span>
+    </div>
 
-@if (anormalies.Any()){
-    <div class = "mt-3 mb-3">
-        <h3 style = "color : #b91c1c;"> Tespit edilen Anomaliler</h3>
-        <ul class = "list-group">
-            @foreach(var anomaly in anormalies.Take(10)){
-                <li class = "list-group-item" style="border-left : 4px solid #b91c1c;">
-                <strong> [@anomaly.RuleName]</strong> - @anomaly.Description
-                <span class="text-muted" style="float : right;">@anomaly.Timestamp.ToString("HH:mm:ss")</span>
-                </li>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px;">     
+       <div class="tt-card">
+            <div class="tt-label">TOPLAM OLAY</div>
+            <div class="tt-stat-value" style="color: var(--tt-text);">@anormalies.Count</div>
+        </div>
+        <div class="tt-card">
+            <div class="tt-label">BRUTE-FORCE</div>
+            <div class="tt-stat-value" style="color: var(--tt-red-text);">@anormalies.Count(a => a.RuleName == "Brute Force Tespiti")</div>
+        </div>
+        <div class="tt-card">
+            <div class="tt-label">VERİ TRANSFERİ</div>
+            <div class="tt-stat-value" style="color: var(--tt-amber);">@anormalies.Count(a => a.RuleName == "Anormal Veri Transferi")</div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(latestSummary))
+    {
+        <div class="tt-card" style="border-left: 3px solid var(--tt-blue); margin-bottom: 14px;">
+            <div class="tt-label" style="color: var(--tt-blue); margin-bottom: 6px;">🤖 AI GÜVENLİK ÖZETİ</div>
+            <div style="font-size: 18px; color: var(--tt-text-soft); line-height: 1.5;">@latestSummary</div>
+            <div class="tt-mono" style="font-size: 18px; color: var(--tt-text-muted); margin-top: 6px;">@summaryTimestamp?.ToString("HH:mm:ss")</div>
+        </div>
+    }
+
+    <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 18px;">
+        <div class="tt-card" style="max-height: 520px; overflow-y: auto;">
+            <div class="tt-label" style="margin-bottom: 10px;">SON ANOMALİLER</div>
+            @if (!anormalies.Any())
+            {
+                <div style="font-size: 15px; color: var(--tt-text-muted);">Henüz anomali tespit edilmedi.</div>
             }
-        </ul>
-    </div>
-}
-@if(!string.IsNullOrEmpty(latestSummary)){
-    <div class="mt-3 mb-3" style="background: #eff6ff; border-left: 4px solid #2563eb; padding: 12px 16px; border-radius: 4px;">
-        <h3 style= " color : #1e40af;"> AI ozeti </h3>
-        <p>@latestSummary</p>
-        <span class="text-muted" style="font-size: 12px;">Son Guncelleme : @summaryTimestamp?.ToString(("HH:mm:ss"))</span>
-    </div>
-}
-<table class="table">
-    <thead>
-        <tr>
-            <th>Zaman</th>
-            <th>Kaynak IP</th>
-            <th>Hedef</th>
-            <th>Boyut</th>
-        </tr>
-    </thead>
+            else
+            {
+                @foreach (var anomaly in anormalies.Take(10))
+                {
+                    <div style="border-left: 2px solid var(--tt-red); padding-left: 10px; margin-bottom: 10px;">
+                        <div style="font-size: 15px; color: var(--tt-text);">@anomaly.RuleName — @anomaly.Description</div>
+                        <div class="tt-mono" style="font-size: 13px; color: var(--tt-text-muted);">@anomaly.Timestamp.ToString("HH:mm:ss")</div>
+                    </div>
+                }
+            }
+        </div>
 
-    <tbody>
-        @foreach (var packet in packets.Take(30))
-        {
-            <tr>
-                <td>@packet.Timestamp.ToString("HH:mm:ss")</td>
-                <td>@packet.SourceIp</td>
-                <td>@packet.DestinationIp:@packet.DestinationPort</td>
-                <td>@packet.SizeBytes byte</td>
-            </tr>
-        }
-    </tbody>
-</table>
+        <div class="tt-card" style="padding: 0; max-height: 400px; overflow-y: auto;">
+            <div style="display: grid; grid-template-columns: 90px 2fr 2fr 60px; padding: 12px 18px; position: sticky; top: 0; background: var(--tt-surface); border-bottom: 1px solid var(--tt-border);">
+                <span class="tt-label">ZAMAN</span>
+                <span class="tt-label">KAYNAK</span>
+                <span class="tt-label">HEDEF</span>
+                <span class="tt-label">BOYUT</span>
+            </div>
+            @foreach (var packet in packets.Take(30))
+            {
+                <div style="display: grid; grid-template-columns: 90px 2fr 2fr 60px; padding: 12px 18px; border-bottom: 1px solid var(--tt-border-soft);" class="tt-mono">
+                    <span style="font-size: 15px; color: var(--tt-text-soft);">@packet.Timestamp.ToString("HH:mm:ss")</span>
+                    <span style="font-size: 15px; color: var(--tt-green);">@packet.SourceIp</span>
+                    <span style="font-size: 15px; color: var(--tt-text-soft);">@packet.DestinationIp:@packet.DestinationPort</span>
+                    <span style="font-size: 15px; color: var(--tt-text-soft);">@packet.SizeBytes B</span>
+                </div>
+            }
+        </div>
+
+    </div>
+
+</div>
 
 @code
 {

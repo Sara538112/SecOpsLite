@@ -1,0 +1,17 @@
+# --- Aşama 1: Build ---
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+COPY SecOpsLite.Web/SecOpsLite.Web.csproj SecOpsLite.Web/
+RUN dotnet restore SecOpsLite.Web/SecOpsLite.Web.csproj
+
+COPY SecOpsLite.Web/ SecOpsLite.Web/
+WORKDIR /src/SecOpsLite.Web
+RUN dotnet publish -c Release -o /app
+
+# --- Aşama 2: Runtime ---
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+COPY --from=build /app .
+
+ENTRYPOINT ["dotnet", "SecOpsLite.Web.dll"]

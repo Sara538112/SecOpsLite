@@ -6,11 +6,34 @@ services:
     environment:
       POSTGRES_DB: secopslite
       POSTGRES_USER: secopslite-user
-      POSTGRES_PASSWORD: sarcheopslite
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5433:5432"
     volumes:
       - secopslite-pgdata:/var/lib/postgresql/data
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: secopslite-web
+    restart: unless-stopped
+    ports:
+      - "5128:8080"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: secopslite-worker
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - web
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=secopslite;Username=secopslite-user;Password=${POSTGRES_PASSWORD}"
+      Groq__ApiKey: ${GROQ_API_KEY}
+      HubUrl: "http://web:8080/packetHub"
 
 volumes:
   secopslite-pgdata:

@@ -16,19 +16,24 @@ public class PacketConsumer : BackgroundService{
     private readonly TimeSpan _analysisWindow = TimeSpan.FromSeconds(10); 
     private readonly Dictionary<string , DateTime> _recentlyNotified = new();
     private readonly TimeSpan _notificationCooldown = TimeSpan.FromSeconds(30);
+    private readonly IConfiguration _configuration;
+
 
     public PacketConsumer(ILogger <PacketConsumer> logger , ChannelReader <NetworkPacket> reader ,
-     AnormalyDetector anormalyDetector , IServiceProvider serviceProvider){
+     AnormalyDetector anormalyDetector , IServiceProvider serviceProvider , IConfiguration configuration){
         _logger = logger;
         _reader = reader;
         _anormalyDetector = anormalyDetector;
         _serviceProvider = serviceProvider;
+         _configuration = configuration;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken){
         //SignalR baglanti nesnesi
+        var hubUrl = _configuration["HubUrl"] ?? "http://localhost:5128/packetHub";
+
         _hubConnection = new HubConnectionBuilder()
-            .WithUrl("http://localhost:5128/packetHub")
+            .WithUrl(hubUrl)
             .WithAutomaticReconnect()
             .Build();
         

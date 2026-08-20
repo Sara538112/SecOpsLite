@@ -28,107 +28,149 @@ public class PacketConsumer : BackgroundService{
          _configuration = configuration;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken){
-        //SignalR baglanti nesnesi
-        var hubUrl = _configuration["HubUrl"] ?? "http://localhost:5128/packetHub";
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        var hubUrl = _configuration["HubUrl"]
+                    ?? "http://localhost:5128/packetHub";
 
         _hubConnection = new HubConnectionBuilder()
             .WithUrl(hubUrl)
             .WithAutomaticReconnect()
             .Build();
-        
+
         var connected = false;
         var retryCount = 0;
 
         while (!connected && retryCount < 10)
         {
+        try
+        {
+            await _hubConnection.StartAsync(stoppingToken);
+            connected = true;
+
+            _logger.LogInformation(
+                "SignalR Hub'na bağlandı: {HubUrl}",
+                hubUrl);
+        }
+        catch (Exception ex)
+        {
+            retryCount++;
+
+            _logger.LogWarning(
+                "Hub'a bağlanılamadı ({Attempt}/10), 5 saniye sonra tekrar denenecek: {Error}",
+                retryCount,
+                ex.Message);
+
+            await Task.Delay(
+                TimeSpan.FromSeconds(5),
+                stoppingToken);
+        }
+        }
+
+        if (!connected)
+        {
+        _logger.LogError("SignalR Hub'a bağlanılamadı.");
+        return;
+        }
+
+
+
+        await foreach (var packet in _reader.ReadAllAsync(stoppingToken))
+        {
             try
             {
-                await _hubConnection.StartAsync(stoppingToken);
-                connected = true;
-                _logger.LogInformation("SignalR Hub'na bağlandı.");
+                if (_hubConnection.State == HubConnectionState.Connected)
+                {
+                    await _hubConnection.InvokeAsync(
+                        "SendPacket",
+                        packet,
+                        stoppingToken);
+                }
+
+                _recentPackets.Add(packet);
+
+                var cutoff = DateTime.UtcNow - _analysisWindow;
+
+                _recentPackets.RemoveAll(
+                    p => p.Timestamp < cutoff);
+
+                var anomalies =
+                    _anormalyDetector.DetectAnormalies(_recentPackets);
+
+                foreach (var (ruleName, result) in anomalies)
+                {
+                    try
+                    {
+                        var notificationKey =
+                            $"{ruleName}:{result.SourceIp}";
+
+                        if (_recentlyNotified.TryGetValue(
+                            notificationKey,
+                            out var lastNotified))
+                        {
+                            if (DateTime.UtcNow - lastNotified <
+                                _notificationCooldown)
+                            {
+                                continue;
+                            }
+                        }
+
+                        _recentlyNotified[notificationKey] =
+                            DateTime.UtcNow;
+
+                        _logger.LogWarning(
+                            "ANOMALİ [{Rule}]: {Description}",
+                            ruleName,
+                            result.Description);
+
+                        using var scope =
+                            _serviceProvider.CreateScope();
+
+                        var context =
+                            scope.ServiceProvider
+                                .GetRequiredService<AppDbContext>();
+
+                        context.AnomalyEvents.Add(
+                            new AnomalyEvent
+                            {
+                                RuleName = ruleName,
+                                Description = result.Description,
+                                SourceIp = result.SourceIp,
+                                DetectedAt = DateTime.UtcNow
+                            });
+
+                        await context.SaveChangesAsync(
+                            stoppingToken);
+
+                        if (_hubConnection.State ==
+                            HubConnectionState.Connected)
+                        {
+                            await _hubConnection.InvokeAsync(
+                                "SendAnormaly",
+                                new
+                                {
+                                    RuleName = ruleName,
+                                    Description = result.Description,
+                                    Timestamp = DateTime.UtcNow
+                                },
+                                stoppingToken);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(
+                            ex,
+                            "Anomali işlenirken hata oluştu. Rule: {Rule}",
+                            ruleName);
+                    }
+                }
             }
             catch (Exception ex)
             {
-                retryCount++;
-                _logger.LogWarning("Hub'a bağlanılamadı ({Attempt}/10), 5 saniye sonra tekrar denenecek: {Error}", retryCount, ex.Message);
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                _logger.LogError(
+                    ex,
+                    "Packet işlenirken hata oluştu.");
             }
-        }
-
-        await _hubConnection.StartAsync(stoppingToken);
-        
-        await foreach ( var packet in _reader.ReadAllAsync(stoppingToken)){
-            await _hubConnection.InvokeAsync("SendPacket" , packet , stoppingToken);
-            _recentPackets.Add(packet);
-
-            var cutoff = DateTime.UtcNow - _analysisWindow;
-            _recentPackets.RemoveAll(p => p.Timestamp < cutoff);
-
-            var anormalies = _anormalyDetector.DetectAnormalies(_recentPackets);
-
-           foreach (var (ruleName, result) in anormalies)
-            {
-                try
-                {
-                    var notificationKey = $"{ruleName}:{result.SourceIp}";
-
-                    if (_recentlyNotified.TryGetValue(
-                        notificationKey,
-                        out var lastNotified))
-                    {
-                        if (DateTime.UtcNow - lastNotified < _notificationCooldown)
-                        {
-                            continue;
-                        }
-                    }
-
-                    _recentlyNotified[notificationKey] = DateTime.UtcNow;
-
-                    _logger.LogWarning(
-                        "ANOMALİ [{Rule}]: {Description}",
-                        ruleName,
-                        result.Description);
-
-                    // Veritabanına kaydet
-                    using var scope = _serviceProvider.CreateScope();
-
-                    var context =
-                        scope.ServiceProvider
-                            .GetRequiredService<AppDbContext>();
-
-                    context.AnomalyEvents.Add(new AnomalyEvent
-                    {
-                        RuleName = ruleName,
-                        Description = result.Description,
-                        SourceIp = result.SourceIp,
-                        DetectedAt = DateTime.UtcNow
-                    });
-
-                    await context.SaveChangesAsync(stoppingToken);
-
-                    // Dashboard'a gönder
-                    await _hubConnection.InvokeAsync(
-                        "SendAnormaly",
-                        new
-                        {
-                            RuleName = ruleName,
-                            Description = result.Description,
-                            Timestamp = DateTime.UtcNow
-                        },
-                        stoppingToken);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(
-                        ex,
-                        "Anomali işlenirken hata oluştu. Rule: {Rule}",
-                        ruleName);
-                }
-            }
-        
-    
-
         }
     }
 }

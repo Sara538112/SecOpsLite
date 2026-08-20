@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @implements IAsyncDisposable
 @using System.Linq
+@inject NavigationManager NavigationManager
 
 <PageTitle>SecOpsLite</PageTitle>
 
@@ -96,8 +97,10 @@
         if (!firstRender)
             return;
 
+        var hubUrl = new Uri("http://web:8080/packetHub");
+
         hubConnection = new HubConnectionBuilder()
-            .WithUrl("http://localhost:5128/packetHub")
+            .WithUrl(hubUrl)
             .WithAutomaticReconnect()
             .Build();
 
@@ -106,21 +109,25 @@
             packet =>
             {
                 packets.Insert(0, packet);
-
                 InvokeAsync(StateHasChanged);
             });
-        hubConnection.On<AnormalyDisplayModel>("ReceiveAnormaly" , (anormaly) =>
-        {
-            anormalies.Insert(0, anormaly);
-            InvokeAsync(StateHasChanged);
-        });
 
-        hubConnection.On<SummaryDisplayModel>("ReceiveSummary",(summary)=>
-        {
-            latestSummary= summary.Summary;
-            summaryTimestamp = summary.Timestamp;
-            InvokeAsync(StateHasChanged);
-        });
+        hubConnection.On<AnormalyDisplayModel>(
+            "ReceiveAnormaly",
+            anormaly =>
+            {
+                anormalies.Insert(0, anormaly);
+                InvokeAsync(StateHasChanged);
+            });
+
+        hubConnection.On<SummaryDisplayModel>(
+            "ReceiveSummary",
+            summary =>
+            {
+                latestSummary = summary.Summary;
+                summaryTimestamp = summary.Timestamp;
+                InvokeAsync(StateHasChanged);
+            });
 
         try
         {

@@ -37,6 +37,25 @@ public class PacketConsumer : BackgroundService{
             .WithAutomaticReconnect()
             .Build();
         
+        var connected = false;
+        var retryCount = 0;
+
+        while (!connected && retryCount < 10)
+        {
+            try
+            {
+                await _hubConnection.StartAsync(stoppingToken);
+                connected = true;
+                _logger.LogInformation("SignalR Hub'na bağlandı.");
+            }
+            catch (Exception ex)
+            {
+                retryCount++;
+                _logger.LogWarning("Hub'a bağlanılamadı ({Attempt}/10), 5 saniye sonra tekrar denenecek: {Error}", retryCount, ex.Message);
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            }
+        }
+
         await _hubConnection.StartAsync(stoppingToken);
         
         await foreach ( var packet in _reader.ReadAllAsync(stoppingToken)){
